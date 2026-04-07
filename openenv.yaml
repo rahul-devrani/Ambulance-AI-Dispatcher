@@ -1,0 +1,9 @@
+name: ambulance-rescue-ai
+version: 1.0.0
+sdk: docker
+entrypoint: server.app:app
+description: "AI-powered emergency ambulance routing system optimizing for patient survival and hospital resources."
+labels:
+  - openenv
+  - real-world-simulation
+  - healthcare-logistics

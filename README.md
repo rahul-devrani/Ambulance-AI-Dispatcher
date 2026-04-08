@@ -45,17 +45,6 @@ python inference.py
 Streamlit UI:
 streamlit run app_ui.py
 
-Project Structure
-ambulance-env/
-│
-├── env/
-├── server/
-├── data/
-├── inference.py
-├── app_ui.py
-├── Dockerfile
-├── openenv.yaml
-└── README.md
 
 Author
 Rahul Devrani

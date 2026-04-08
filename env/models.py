@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
 class Action(BaseModel):
     next_node: str
@@ -10,6 +10,11 @@ class Observation(BaseModel):
     patient_location: str
     target_hospital: str
     patient_health: float
-    patient_severity: str
-    phase: str
+    severity: str
+    picked: bool
+    steps: int
     message: str
+
+class Reward(BaseModel):
+    value: float
+    breakdown: Dict[str, float]

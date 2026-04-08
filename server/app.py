@@ -1,21 +1,29 @@
 from fastapi import FastAPI, Body
+from fastapi.middleware.cors import CORSMiddleware
 from env.engine import AmbulanceEngine
-from env.models import Action
 
-app = FastAPI(title="Smart Ambulance AI")
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 engine = AmbulanceEngine()
 
 @app.post("/reset")
-async def reset(data: dict = Body(None)):
-    p_loc = data.get("p_loc") if data else None
-    p_sev = data.get("p_sev") if data else None
-    return {"observation": engine.reset(p_loc, p_sev)}
+def reset(data: dict = Body(default={})):
+    obs = engine.reset(data.get("p_loc"), data.get("p_sev"))
+    return {"observation": obs, "reward": 0.0, "done": False}
 
 @app.post("/step")
-async def step(action: Action):
-    obs, reward, done = engine.step(action.next_node)
-    return {"observation": obs, "reward": reward, "done": done}
+def step(data: dict = Body(...)):
+    next_node = data.get("next_node")
+    obs, reward, done = engine.step(next_node)
+    return {"observation": obs, "reward": float(reward), "done": bool(done), "info": {}}
 
 @app.get("/state")
-async def state():
-    return engine._obs("Current State")
+def state():
+    return engine._obs("state")

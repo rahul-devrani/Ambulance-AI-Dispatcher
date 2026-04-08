@@ -1,72 +1,72 @@
-import os
-import asyncio
-import requests
-import heapq
-import json
+import os, requests, json
+from openai import OpenAI
 
-# config
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
-HF_TOKEN = os.getenv("HF_TOKEN")
-BASE_URL = "http://localhost:7860"
+BASE_URL = os.getenv("ENV_URL", "http://localhost:7860")
+MODEL = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+API_BASE = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+TOKEN = os.getenv("HF_TOKEN")
 
-def get_path(start, end, edges):
-    queue = [(0, start, [])]
-    seen = set()
-    while queue:
-        (cost, node, path) = heapq.heappop(queue)
-        if node not in seen:
-            path = path + [node]
-            if node == end: return path[1:]
-            seen.add(node)
-            for n, w in edges.get(node, {}).items():
-                heapq.heappush(queue, (cost + w, n, path))
-    return []
+client = OpenAI(base_url=API_BASE, api_key=TOKEN)
+visited_history = []
 
-async def main():
-    print(f"[START] task=emergency_rescue_hard env=ambulance model={MODEL_NAME}")
+def get_llm_decision(obs):
+    global visited_history
+    target = obs['target_hospital'] if obs['picked'] else obs['patient_location']
+    history_str = ", ".join(visited_history[-5:])
+
+    prompt = f"""
+    Ambulance GPS System:
+    Current Node: {obs['current_node']}
+    Neighbors: {obs['neighbors']}
+    Goal: Reach {target}
+    Status: {'Picked' if obs['picked'] else 'Searching'}
+    Recent History: {history_str}
+
+    Instruction: Select the neighbor that leads to the goal. 
+    Crucial: DO NOT pick a neighbor from the 'Recent History' unless it's the only option.
+    Return ONLY the node name.
+    """
     
     try:
-        with open("data/dehradun_map.json") as f:
-            edges = json.load(f)["edges"]
-
-        # Reset Env
-        res = requests.post(f"{BASE_URL}/reset", json={"p_loc": "Bhaniyawala", "p_sev": "Critical"}).json()
-        obs = res["observation"]
+        res = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": "You are a smart emergency navigator."},
+                      {"role": "user", "content": prompt}],
+            max_tokens=15,
+            temperature=0.1
+        )
+        action = res.choices[0].message.content.strip().split('\n')[0].replace(".", "")
+        if action not in obs["neighbors"]:
+            action = obs["neighbors"][0]
         
-        rewards = []
-        step_count = 0
-        done = False
+        visited_history.append(action)
+        return action
+    except:
+        return obs["neighbors"][0]
 
-        # Phase 1: Go to Patient -> Phase 2: Go to Hospital
-        targets = [obs['patient_location'], obs['target_hospital']]
+def run_task(task, loc, sev):
+    global visited_history
+    visited_history = []
+    print(f"[START] task={task} env=ambulance model={MODEL}")
+    
+    res = requests.post(f"{BASE_URL}/reset", json={"p_loc": loc, "p_sev": sev}).json()
+    obs = res["observation"]
+    
+    done, steps, rewards = False, 0, []
+    while not done and steps < 50:
+        action = get_llm_decision(obs)
+        r = requests.post(f"{BASE_URL}/step", json={"next_node": action}).json()
         
-        for target in targets:
-            if obs['current_node'] == target: continue
-            path = get_path(obs['current_node'], target, edges)
-            
-            for move in path:
-                step_count += 1
-                step_res = requests.post(f"{BASE_URL}/step", json={"next_node": move}).json()
-                obs, reward, done = step_res["observation"], step_res["reward"], step_res["done"]
-                rewards.append(reward)
-                
-                print(f"[STEP] step={step_count} action={move} reward={reward:.2f} done={str(done).lower()} error=null")
-                if done: break
-            if done: break
+        obs, reward, done = r["observation"], r["reward"], r["done"]
+        steps += 1
+        rewards.append(reward)
+        print(f"[STEP] step={steps} action={action} reward={reward:.2f} done={str(done).lower()} error=null")
 
-        # Final Scoring
-        success_status = obs["patient_health"] > 0 and done
-        success = "true" if success_status else "false"
-        
-        # Grading Logic: 1.0 for success, otherwise based on health
-        score = 1.0 if success_status else (obs["patient_health"] / 100.0)
-        
-        reward_list_str = ",".join([f"{r:.2f}" for r in rewards])
-        print(f"[END] success={success} steps={step_count} score={score:.2f} rewards={reward_list_str}")
-
-    except Exception as e:
-        print(f"[END] success=false steps=0 score=0.00 rewards=0.00")
+    success = obs['picked'] and obs['current_node'] == obs['target_hospital'] and obs['patient_health'] > 0
+    score = 1.0 if success else (obs['patient_health'] / 100.0)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={','.join([f'{r:.2f}' for r in rewards])}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_task("easy", "Saharanpur Chowk", "Stable")
+    run_task("medium", "Ballupur", "Stable")
+    run_task("hard", "Bhaniyawala", "Critical")

@@ -1,0 +1,17 @@
+[project]
+name = "ambulance-ai-rescue"
+version = "1.0.0"
+description = "OpenEnv ambulance routing environment"
+authors = [
+  { name="Rahul Devrani" }
+]
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "pydantic",
+  "requests",
+  "openai"
+]
+
+[tool.openenv]
+entrypoint = "server.app:app"

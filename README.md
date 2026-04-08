@@ -33,11 +33,6 @@ Reward Design
 - Invalid move: -10
 - Patient death / timeout: -100
 
-Run Instructions
-
-Docker:
-docker build -t ambulance .
-docker run -p 7860:7860 ambulance
 
 Inference:
 python inference.py

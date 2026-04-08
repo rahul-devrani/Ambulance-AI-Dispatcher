@@ -39,7 +39,3 @@ python inference.py
 
 Streamlit UI:
 streamlit run app_ui.py
-
-
-Author
-Rahul Devrani

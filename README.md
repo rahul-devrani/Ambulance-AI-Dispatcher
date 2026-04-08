@@ -1,4 +1,4 @@
-# Ambulance AI Rescue Pro
+# Ambulance AI Rescue
 
 A real-world OpenEnv reinforcement learning environment for ambulance routing in Dehradun. The agent must navigate a city graph, pick up a patient, and deliver them to the correct hospital before their health reaches zero.
 
